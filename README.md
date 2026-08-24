@@ -99,6 +99,9 @@ never the subject, it's the material spec-driven development is practised on.
 - Git, and a GitHub account
 - A terminal you are comfortable opening
 - [Claude Code](https://docs.claude.com/en/docs/claude-code) installed
+- [Pylint](https://pylint.readthedocs.io/) installed and on your `PATH` (e.g. `brew install pylint`
+  or `pipx install pylint`) — `.claude/hooks/pylint-check.py` runs it after every Python file edit
+  and feeds findings back to the agent; without it, that hook silently skips
 - **A lead** — someone who reviews the pull request before it merges. Working alone, a fresh
   Claude Code session can stand in, though it will not push back on a product decision the way a
   person will.
