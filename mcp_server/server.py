@@ -10,11 +10,14 @@ blanket service credential.
 
 import os
 
+from dotenv import load_dotenv
 from fastmcp import FastMCP
 from fastmcp.server.auth.providers.google import GoogleProvider
 from fastmcp.server.dependencies import get_access_token
 
 import django_client
+
+load_dotenv()
 
 MCP_BASE_URL = os.environ.get('MCP_BASE_URL', 'http://localhost:8100')
 
