@@ -7,6 +7,7 @@ remember.
 """
 
 import os
+import time
 
 import httpx2
 
@@ -24,11 +25,13 @@ class DjangoAPIError(Exception):
 
 async def exchange_google_token(google_access_token):
     """Trade a verified Google access token for this project's own DRF token."""
+    start = time.perf_counter()
     async with httpx2.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
         response = await client.post(
             f'{DJANGO_API_BASE}/auth/google/',
             json={'access_token': google_access_token},
         )
+    print(f'[timing] POST /auth/google/: {time.perf_counter() - start:.3f}s', flush=True)
     if response.status_code != 200:
         raise DjangoAPIError(_detail(response))
     return response.json()['token']
@@ -38,12 +41,14 @@ async def _get_users(django_token, country=None):
     """The raw, unfiltered rows - id included. Internal use only; never returned
     directly from a tool."""
     params = {'country': country} if country else {}
+    start = time.perf_counter()
     async with httpx2.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
         response = await client.get(
             f'{DJANGO_API_BASE}/users/',
             params=params,
             headers={'Authorization': f'Token {django_token}'},
         )
+    print(f'[timing] GET /users/: {time.perf_counter() - start:.3f}s', flush=True)
     if response.status_code != 200:
         raise DjangoAPIError(_detail(response))
     return response.json()
@@ -64,12 +69,14 @@ async def change_password(django_token, username, new_password):
     if match is None:
         raise DjangoAPIError(f'No user found with username {username!r}.')
 
+    start = time.perf_counter()
     async with httpx2.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
         response = await client.post(
             f"{DJANGO_API_BASE}/users/{match['id']}/change-password/",
             json={'password': new_password},
             headers={'Authorization': f'Token {django_token}'},
         )
+    print(f'[timing] POST /change-password/: {time.perf_counter() - start:.3f}s', flush=True)
     if response.status_code != 200:
         raise DjangoAPIError(_detail(response))
     return {'detail': 'Password changed.'}
