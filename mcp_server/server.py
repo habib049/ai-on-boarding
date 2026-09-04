@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from fastmcp import FastMCP
 from fastmcp.server.auth.providers.google import GoogleProvider
 from fastmcp.server.dependencies import get_access_token
+from fastmcp.utilities.token_cache import TokenCache
 
 import django_client
 
@@ -21,11 +22,48 @@ load_dotenv()
 
 MCP_BASE_URL = os.environ.get('MCP_BASE_URL', 'http://localhost:8100')
 
+# How long a verified Google token is trusted before FastMCP checks with Google
+# again. TokenCache also caps this at the token's own expiry, so this is a
+# ceiling, not a guarantee of staying cached this long.
+GOOGLE_TOKEN_CACHE_TTL_SECONDS = int(os.environ.get('GOOGLE_TOKEN_CACHE_TTL_SECONDS', '300'))
+
 auth = GoogleProvider(
     client_id=os.environ['GOOGLE_CLIENT_ID'],
     client_secret=os.environ['GOOGLE_CLIENT_SECRET'],
     base_url=MCP_BASE_URL,
     required_scopes=['openid', 'email'],
+)
+
+
+class CachingGoogleTokenVerifier:
+    """Wraps GoogleProvider's real verifier with a TTL cache, so a token already
+    verified recently skips the network call to Google's tokeninfo endpoint.
+
+    GoogleProvider has no built-in caching (unlike FastMCP's own GitHubProvider,
+    which ships this exact pattern with FastMCP's own TokenCache). The
+    alternative - overriding OAuthProxy.load_access_token - was ruled out: that
+    method is 183 lines handling refresh locking, revocation, and JTI mapping,
+    with the Google network call as only one small piece inside it. Wrapping
+    the verifier this class delegates to skips that call without touching any
+    of the logic around it.
+    """
+
+    def __init__(self, inner_verifier, ttl_seconds):
+        self._inner = inner_verifier
+        self._cache = TokenCache(ttl_seconds=ttl_seconds)
+
+    async def verify_token(self, token):
+        is_cached, cached_result = self._cache.get(token)
+        if is_cached:
+            return cached_result
+        result = await self._inner.verify_token(token)
+        if result is not None:
+            self._cache.set(token, result)
+        return result
+
+
+auth._token_validator = CachingGoogleTokenVerifier(
+    auth._token_validator, ttl_seconds=GOOGLE_TOKEN_CACHE_TTL_SECONDS
 )
 
 mcp = FastMCP('django-user-reporting', auth=auth)

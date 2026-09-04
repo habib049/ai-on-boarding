@@ -25,6 +25,10 @@ pip install -r requirements.txt
   callback. Defaults to `http://localhost:8100`.
 - `DJANGO_API_BASE` - base URL of the Django API. Defaults to
   `http://localhost:8000/api`.
+- `GOOGLE_TOKEN_CACHE_TTL_SECONDS` - how long a verified Google login is
+  trusted before re-checking with Google. Defaults to `300` (5 minutes).
+  Without this, every single tool call re-verifies with Google over the
+  network, even for the same login. Set to `0` to disable caching.
 
 The Django app also needs `GOOGLE_OAUTH_CLIENT_IDS` set to the same client id
 (comma-separated if there are several), so `/api/auth/google/` accepts tokens
