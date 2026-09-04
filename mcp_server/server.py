@@ -9,7 +9,6 @@ blanket service credential.
 """
 
 import os
-import time
 
 from dotenv import load_dotenv
 from fastmcp import FastMCP
@@ -56,14 +55,8 @@ class CachingGoogleTokenVerifier:
     async def verify_token(self, token):
         is_cached, cached_result = self._cache.get(token)
         if is_cached:
-            print('[cache] HIT - skipped the call to Google', flush=True)
             return cached_result
-
-        start = time.perf_counter()
         result = await self._inner.verify_token(token)
-        elapsed = time.perf_counter() - start
-        print(f'[cache] MISS - called Google, took {elapsed:.3f}s', flush=True)
-
         if result is not None:
             self._cache.set(token, result)
         return result
@@ -78,50 +71,29 @@ mcp = FastMCP('django-user-reporting', auth=auth)
 
 async def _django_token():
     """The caller's Django token, obtained via the Google token FastMCP verified."""
-    start = time.perf_counter()
     access_token = get_access_token()
-    token = await django_client.exchange_google_token(access_token.token)
-    print(f'[timing] _django_token: {time.perf_counter() - start:.3f}s', flush=True)
-    return token
+    return await django_client.exchange_google_token(access_token.token)
 
 
 @mcp.tool()
 async def list_signup_users():
     """List every signed-up user (username, country, signup date)."""
-    call_start = time.perf_counter()
     token = await _django_token()
-
-    step_start = time.perf_counter()
-    result = await django_client.list_users(token)
-    print(f'[timing] list_users call: {time.perf_counter() - step_start:.3f}s', flush=True)
-    print(f'[timing] list_signup_users total: {time.perf_counter() - call_start:.3f}s', flush=True)
-    return result
+    return await django_client.list_users(token)
 
 
 @mcp.tool()
 async def list_users_by_country(country: str):
     """List signed-up users from a specific country."""
-    call_start = time.perf_counter()
     token = await _django_token()
-
-    step_start = time.perf_counter()
-    result = await django_client.list_users(token, country=country)
-    print(f'[timing] list_users call: {time.perf_counter() - step_start:.3f}s', flush=True)
-    print(f'[timing] list_users_by_country total: {time.perf_counter() - call_start:.3f}s', flush=True)
-    return result
+    return await django_client.list_users(token, country=country)
 
 
 @mcp.tool()
 async def change_user_password(username: str, new_password: str):
     """Change a user's password. Only works if the caller is an admin."""
-    call_start = time.perf_counter()
     token = await _django_token()
-
-    step_start = time.perf_counter()
-    result = await django_client.change_password(token, username, new_password)
-    print(f'[timing] change_password call: {time.perf_counter() - step_start:.3f}s', flush=True)
-    print(f'[timing] change_user_password total: {time.perf_counter() - call_start:.3f}s', flush=True)
-    return result
+    return await django_client.change_password(token, username, new_password)
 
 
 if __name__ == '__main__':
