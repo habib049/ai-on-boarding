@@ -17,6 +17,7 @@ urlpatterns = [
         views.PasswordResetConfirmView.as_view(),
         name='password-reset-confirm',
     ),
+    path('auth/google/', views.GoogleAuthView.as_view(), name='google-auth'),
     path('users/', views.UserListView.as_view(), name='user-list'),
     path(
         'users/<int:user_id>/change-password/',

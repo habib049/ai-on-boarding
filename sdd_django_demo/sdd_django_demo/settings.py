@@ -261,3 +261,20 @@ DEFAULT_FROM_EMAIL = os.environ.get('RESET_SMTP_FROM', 'no-reply@example.com')
 # from before) when unset, so local dev and the test suite see no difference.
 
 RESET_LINK_BASE_URL = os.environ.get('RESET_LINK_BASE_URL', 'http://localhost:8000')
+
+
+# Google sign-in
+#
+# This project verifies Google access tokens; it never exchanges an authorization
+# code for one, so no client secret is needed - only the client id(s) a token may
+# name as its audience.
+GOOGLE_OAUTH_CLIENT_IDS = [
+    client_id
+    for client_id in os.environ.get('GOOGLE_OAUTH_CLIENT_IDS', '').split(',')
+    if client_id.strip()
+]
+
+# Restrict Google sign-in to one Workspace domain, e.g. 'arbisoft.com'. Empty means
+# any Google account with a verified address may sign in, provided it already has an
+# account here.
+GOOGLE_ALLOWED_HD = os.environ.get('GOOGLE_ALLOWED_HD', '')

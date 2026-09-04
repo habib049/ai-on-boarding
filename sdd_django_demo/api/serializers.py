@@ -125,3 +125,7 @@ class AdminChangePasswordSerializer(serializers.Serializer):
     password = serializers.CharField(
         required=True, allow_blank=False, write_only=True, validators=[validate_password_strength]
     )
+
+
+class GoogleAuthSerializer(serializers.Serializer):
+    access_token = serializers.CharField(required=True, allow_blank=False, write_only=True)
