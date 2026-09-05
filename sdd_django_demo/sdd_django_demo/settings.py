@@ -273,9 +273,9 @@ RESET_LINK_BASE_URL = os.environ.get('RESET_LINK_BASE_URL', 'http://localhost:80
 # code for one, so no client secret is needed - only the client id(s) a token may
 # name as its audience.
 GOOGLE_OAUTH_CLIENT_IDS = [
-    client_id
+    stripped
     for client_id in os.environ.get('GOOGLE_OAUTH_CLIENT_IDS', '').split(',')
-    if client_id.strip()
+    if (stripped := client_id.strip())
 ]
 
 # Restrict Google sign-in to one Workspace domain, e.g. 'arbisoft.com'. Empty means

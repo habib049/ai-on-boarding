@@ -25,8 +25,8 @@ class FakeResponse:
 
 
 class FakeClient:
-    """Stands in for the shared httpx2.AsyncClient so _send's own error handling
-    really runs."""
+    """Stands in for the shared httpx2.AsyncClient so send_request's own error
+    handling really runs."""
 
     def __init__(self, raises=None, response=None):
         self._raises = raises
@@ -43,7 +43,7 @@ def transport(monkeypatch):
     """Replace the shared HTTP client, leaving every line of django_client in play."""
 
     def _transport(raises=None, response=None):
-        monkeypatch.setattr(django_client, '_client', FakeClient(raises, response))
+        monkeypatch.setattr(django_client, 'django_client', FakeClient(raises, response))
 
     return _transport
 
@@ -58,7 +58,7 @@ def responds(monkeypatch):
                 raise raises
             return response
 
-        monkeypatch.setattr(django_client, '_send', _send)
+        monkeypatch.setattr(django_client, 'send_request', _send)
 
     return _responds
 
@@ -218,7 +218,7 @@ async def test_detail_still_returns_a_json_detail_message_in_full(responds):
     assert str(failure.value) == long_detail
 
 
-# --- change_password refuses an ambiguous username match -----------------------
+# --- change_password refuses when no user matches ----------------------------
 
 
 async def test_change_password_rejects_no_match(responds):
@@ -228,21 +228,3 @@ async def test_change_password_rejects_no_match(responds):
         await django_client.change_password('good-token', 'nobody', 'new-password-1')
 
     assert not isinstance(failure.value, django_client.DjangoAuthError)
-
-
-async def test_change_password_rejects_an_ambiguous_username_match(responds):
-    responds(
-        FakeResponse(
-            200,
-            [
-                {'id': 1, 'username': 'ada', 'country': 'GB'},
-                {'id': 2, 'username': 'ADA', 'country': 'US'},
-            ],
-        )
-    )
-
-    with pytest.raises(django_client.DjangoAPIError) as failure:
-        await django_client.change_password('good-token', 'ada', 'new-password-1')
-
-    assert not isinstance(failure.value, django_client.DjangoAuthError)
-    assert 'more than one' in str(failure.value).lower()

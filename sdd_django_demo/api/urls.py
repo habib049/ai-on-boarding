@@ -20,7 +20,7 @@ urlpatterns = [
     path('auth/google/', views.GoogleAuthView.as_view(), name='google-auth'),
     path('users/', views.UserListView.as_view(), name='user-list'),
     path(
-        'users/<int:user_id>/change-password/',
+        'users/<str:username>/change-password/',
         views.AdminChangePasswordView.as_view(),
         name='admin-change-password',
     ),

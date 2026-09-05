@@ -485,13 +485,13 @@ class AdminChangePasswordView(generics.GenericAPIView):
             200: OpenApiResponse(description='Password changed.'),
             400: OpenApiResponse(description='The new password was rejected.'),
             403: OpenApiResponse(description='Caller is not an admin.'),
-            404: OpenApiResponse(description='No user with that id.'),
+            404: OpenApiResponse(description='No user with that username.'),
         },
     )
-    def post(self, request, user_id, *args, **kwargs):
+    def post(self, request, username, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = get_object_or_404(User, pk=user_id)
+        user = get_object_or_404(User, username=username)
         user.set_password(serializer.validated_data['password'])
         user.save(update_fields=['password'])
         Token.objects.filter(user=user).delete()

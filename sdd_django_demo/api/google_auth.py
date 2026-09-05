@@ -44,15 +44,21 @@ def verify_access_token(access_token):
         raise GoogleTokenError('Token carries no email address.')
 
     required_domain = settings.GOOGLE_ALLOWED_HD
-    if required_domain and _hosted_domain(claims, email) != required_domain:
+    if required_domain and not _matches_hosted_domain(claims, required_domain):
         raise GoogleTokenError('Account is outside the permitted domain.')
 
     return claims
 
 
-def _hosted_domain(claims, email):
+def _matches_hosted_domain(claims, required_domain):
+    """Whether this token's hosted-domain claim satisfies a configured restriction.
+
+    `hd` is Google's own attestation that an account belongs to a Workspace domain;
+    the email address's own domain is not the same thing and is never substituted
+    for it. If a restriction is configured, only a matching `hd` claim satisfies
+    it - a personal Gmail account, or any token with no `hd` at all, does not.
+    """
     hosted_domain = claims.get('hd')
-    if hosted_domain:
-        return hosted_domain
-    _, _, domain = email.partition('@')
-    return domain
+    if not hosted_domain:
+        return False
+    return hosted_domain.lower() == required_domain.lower()
