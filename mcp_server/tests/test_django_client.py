@@ -222,7 +222,7 @@ async def test_detail_still_returns_a_json_detail_message_in_full(responds):
 
 
 async def test_change_password_rejects_no_match(responds):
-    responds(FakeResponse(200, []))
+    responds(FakeResponse(404, {'detail': 'No user with that username.'}))
 
     with pytest.raises(django_client.DjangoAPIError) as failure:
         await django_client.change_password('good-token', 'nobody', 'new-password-1')
