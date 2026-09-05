@@ -16,6 +16,7 @@ from fastmcp.server.auth.providers.google import GoogleProvider
 from fastmcp.server.dependencies import get_access_token
 
 import django_client
+from mcp_middleware import ToolCallLogger, ToolCallRateLimiter
 
 load_dotenv()
 
@@ -150,6 +151,9 @@ _credentials = CredentialCache(ttl_seconds=CREDENTIAL_CACHE_TTL_SECONDS)
 auth._token_validator = CredentialVerifier(auth._token_validator, _credentials)
 
 mcp = FastMCP('django-user-reporting', auth=auth)
+
+mcp.add_middleware(ToolCallLogger())  # outermost, so it also logs a rate-limit rejection
+mcp.add_middleware(ToolCallRateLimiter())
 
 
 async def _call_django(django_call, *args, **kwargs):

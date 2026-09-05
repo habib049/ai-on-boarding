@@ -22,3 +22,6 @@ sdd_django_demo/staticfiles/
 # API verification tooling
 tooling/api-verification/node_modules/
 tooling/api-verification/build/
+
+# MCP server runtime logs
+mcp_server/tool_calls.log
