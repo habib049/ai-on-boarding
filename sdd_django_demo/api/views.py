@@ -468,6 +468,9 @@ class UserListView(generics.ListAPIView):
         country = self.request.query_params.get('country')
         if country:
             queryset = queryset.filter(accountcountry__country__iexact=country)
+        username = self.request.query_params.get('username')
+        if username:
+            queryset = queryset.filter(username__iexact=username)
         return queryset
 
 
