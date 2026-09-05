@@ -107,3 +107,29 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
 class TokenSerializer(serializers.Serializer):
     token = serializers.CharField()
+
+
+class UserAccountSerializer(serializers.ModelSerializer):
+    """The user-list representation. `id` stays (AdminChangePasswordView's URL is keyed
+    on it, and django_client.change_password reads it from this response); `email` is
+    left out - PII an authenticated caller listing users has no need to see."""
+
+    country = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'country', 'date_joined']
+
+    def get_country(self, obj):
+        account_country = getattr(obj, 'accountcountry', None)
+        return account_country.country if account_country else None
+
+
+class AdminChangePasswordSerializer(serializers.Serializer):
+    password = serializers.CharField(
+        required=True, allow_blank=False, write_only=True, validators=[validate_password_strength]
+    )
+
+
+class GoogleAuthSerializer(serializers.Serializer):
+    access_token = serializers.CharField(required=True, allow_blank=False, write_only=True)

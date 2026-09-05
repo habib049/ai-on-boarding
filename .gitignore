@@ -9,6 +9,7 @@ db.sqlite3
 .superpowers/
 .pytest_cache/
 .private/
+.env
 
 # sdd_django_demo build workspace (distilled into reference/signup-worked-example/)
 sdd_django_demo/.venv/
@@ -21,3 +22,6 @@ sdd_django_demo/staticfiles/
 # API verification tooling
 tooling/api-verification/node_modules/
 tooling/api-verification/build/
+
+# MCP server runtime logs
+mcp_server/tool_calls.log

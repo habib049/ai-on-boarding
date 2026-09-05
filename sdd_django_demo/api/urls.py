@@ -17,6 +17,13 @@ urlpatterns = [
         views.PasswordResetConfirmView.as_view(),
         name='password-reset-confirm',
     ),
+    path('auth/google/', views.GoogleAuthView.as_view(), name='google-auth'),
+    path('users/', views.UserListView.as_view(), name='user-list'),
+    path(
+        'users/<str:username>/change-password/',
+        views.AdminChangePasswordView.as_view(),
+        name='admin-change-password',
+    ),
     path('schema/', SpectacularAPIView.as_view(), name='schema'),
     path('docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='docs'),
 ]

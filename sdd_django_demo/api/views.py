@@ -8,27 +8,33 @@ from django.contrib.auth.models import User
 from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import Case, F, Q, Value, When
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views import View
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 from rest_framework import generics
+from rest_framework.authentication import TokenAuthentication
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view
 from rest_framework.exceptions import Throttled, ValidationError
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import SimpleRateThrottle
 
 from embargo.rules import is_user_embargoed
 
+from .google_auth import GoogleTokenError, verify_access_token
 from .models import PasswordResetCode, SigninAttempt
 from .serializers import (
     AccountSerializer,
+    AdminChangePasswordSerializer,
+    GoogleAuthSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     SigninSerializer,
     SignupSerializer,
     TokenSerializer,
+    UserAccountSerializer,
     validate_password_strength,
 )
 
@@ -38,6 +44,15 @@ MAX_FAILURES = 3
 FAILURE_WINDOW = timedelta(minutes=5)
 LOCKOUT_DURATION = timedelta(minutes=30)
 SIGNIN_REJECTION_BODY = {'detail': 'Unable to sign in with the provided credentials.'}
+
+# One body for every way a Google token can be refused, so the response cannot be
+# used to tell them apart.
+GOOGLE_REJECTION_BODY = {'detail': 'Unable to sign in with that Google account.'}
+
+# Separate from the body above: the token was fine, the account is the problem - no
+# match, an ambiguous match, or an embargoed account. One body for all three, so it
+# cannot be used to discover which addresses have accounts here.
+GOOGLE_NO_ACCOUNT_BODY = {'detail': 'That Google account cannot sign in here.'}
 
 # Returned for every reset request, registered or not, so the response cannot be
 # used to discover which addresses have accounts.
@@ -441,3 +456,93 @@ class SigninView(generics.GenericAPIView):
                 email_or_username=attempt_key,
                 defaults={'failed_count': 1, 'window_started_at': now, 'last_failed_at': now},
             )
+
+
+class UserListView(generics.ListAPIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserAccountSerializer
+
+    def get_queryset(self):
+        queryset = User.objects.select_related('accountcountry').order_by('pk')
+        country = self.request.query_params.get('country')
+        if country:
+            queryset = queryset.filter(accountcountry__country__iexact=country)
+        username = self.request.query_params.get('username')
+        if username:
+            queryset = queryset.filter(username__iexact=username)
+        return queryset
+
+
+class AdminChangePasswordView(generics.GenericAPIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAdminUser]
+    serializer_class = AdminChangePasswordSerializer
+
+    @extend_schema(
+        request=AdminChangePasswordSerializer,
+        responses={
+            200: OpenApiResponse(description='Password changed.'),
+            400: OpenApiResponse(description='The new password was rejected.'),
+            403: OpenApiResponse(description='Caller is not an admin.'),
+            404: OpenApiResponse(description='No user with that username.'),
+        },
+    )
+    def post(self, request, username, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = get_object_or_404(User, username=username)
+        user.set_password(serializer.validated_data['password'])
+        user.save(update_fields=['password'])
+        Token.objects.filter(user=user).delete()
+        return Response({'detail': 'Password changed.'}, status=200)
+
+
+def resolve_google_user(email):
+    """The single Django account a verified Google address signs in as, or None.
+
+    Refuses an ambiguous match: User.email carries no uniqueness constraint here, so
+    picking one of several candidates could hand the caller a token for an account
+    that is not theirs.
+    """
+    matches = list(User.objects.filter(email__iexact=email).order_by('pk')[:2])
+    if len(matches) != 1:
+        return None
+    return matches[0]
+
+
+class GoogleAuthView(generics.GenericAPIView):
+    """Sign in with a Google access token obtained elsewhere.
+
+    A second door onto the same room as SigninView: what comes out is the same DRF
+    token, so every other endpoint is unaffected. This verifies the token rather than
+    exchanging a code for it, so it never holds the Google client secret.
+    """
+
+    serializer_class = GoogleAuthSerializer
+
+    @extend_schema(
+        request=GoogleAuthSerializer,
+        responses={
+            200: OpenApiResponse(response=TokenSerializer, description='Signed in.'),
+            401: OpenApiResponse(description='Google refused the token.'),
+            403: OpenApiResponse(
+                description='Verified with Google, but no single account here can sign in.'
+            ),
+        },
+    )
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            claims = verify_access_token(serializer.validated_data['access_token'])
+        except GoogleTokenError:
+            return Response(dict(GOOGLE_REJECTION_BODY), status=401)
+
+        user = resolve_google_user(claims['email'])
+        if user is None or is_user_embargoed(user):
+            return Response(dict(GOOGLE_NO_ACCOUNT_BODY), status=403)
+
+        token, _ = Token.objects.get_or_create(user=user)
+        return Response({'token': token.key}, status=200)
