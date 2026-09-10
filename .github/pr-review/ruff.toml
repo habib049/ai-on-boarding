@@ -1,0 +1,15 @@
+# Layer 1's lint config for the PR review workflow. The workflow only ever lints files a PR
+# actually changed, not the whole repo, so there is no pre-existing-debt-in-untouched-files
+# problem to configure around here.
+src = ["sdd_django_demo"]
+extend-exclude = ["*/.venv/*", "*/node_modules/*", "*/migrations/*"]
+# The workflow passes changed files as explicit paths on the command line; ruff only applies
+# exclude/extend-exclude to files it discovers itself unless force-exclude says otherwise.
+force-exclude = true
+
+[lint]
+# E501 (line-too-long) is off: this codebase wraps prose comments by sentence, not by a fixed
+# column, and established files run well past 100 characters by design - enforcing a line-length
+# limit here would flag the project's own established style, not a defect the PR introduced.
+select = ["E", "F", "I"]
+ignore = ["E501"]
