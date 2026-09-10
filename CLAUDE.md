@@ -51,6 +51,12 @@ Other conventions worth knowing up front (also in `openspec/config.yaml`):
   implementation tasks.
 - Security-sensitive behaviour (auth, credential storage, credential exposure) needs a test that
   asserts it directly, not incidentally through a success path.
+- Credentials never appear as literals in tracked files. API keys, tokens, signing secrets, and
+  passwords are read from the environment or Django settings, the way `SECRET_KEY` and
+  `DATABASE_URL` already are — never written into source, fixtures, or config that git tracks. A
+  secret committed to a tracked file is exposed from that commit onward whether or not the code
+  using it ever runs, so unreachable or not-yet-wired code is no exception, and the fix is to
+  rotate the secret, not only to delete the line.
 - Code is generated from instructions (proposal, spec, design, tasks); when generated code is
   wrong, fix the instruction and regenerate rather than hand-patching the output.
 - Requirement identifiers/names are permanent — a changed requirement keeps its identity, a

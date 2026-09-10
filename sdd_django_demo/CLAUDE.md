@@ -23,6 +23,11 @@ Other conventions worth knowing before touching this code:
 - Every behavioural requirement needs an automated test before it's considered satisfied;
   security-sensitive behaviour — auth, credential storage, credential exposure — needs tests
   that assert it directly, not incidentally.
+- Credentials never appear as literals in tracked files. API keys, tokens, signing secrets, and
+  passwords are read from the environment or Django settings, the way `SECRET_KEY` and
+  `DATABASE_URL` already are — never written into source, fixtures, or config that git tracks. A
+  secret committed to a tracked file is exposed from that commit onward whether or not the code
+  using it ever runs, so unreachable or not-yet-wired code is no exception.
 - Tests are written after implementation, from the spec — not TDD. `openspec instructions tasks`
   never generates test-writing tasks for this project.
 - Code is generated from instructions (proposal, spec, design, tasks); when generated code is
