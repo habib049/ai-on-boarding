@@ -5,6 +5,11 @@
 # gunicorn added 2026-09-02, pinned to the current stable release - the WSGI server a real
 # deployment runs behind (manage.py runserver is dev-only and isn't meant for production
 # traffic); unused by local dev or the test suite.
+# requests added 2026-09-04, pinned to the version already resolved as a transitive
+# dependency, for the Google tokeninfo call in api/google_auth.py.
+# python-dotenv added 2026-09-04, pinned to the current stable release, so settings.py
+# can load GOOGLE_OAUTH_CLIENT_IDS etc. from .env instead of requiring them to be
+# exported in the shell every time the server starts.
 asgiref==3.12.1
 attrs==26.1.0
 Django==6.1
@@ -21,8 +26,10 @@ psycopg[binary]==3.3.5
 Pygments==2.21.0
 pytest==9.1.1
 pytest-django==4.14.0
+python-dotenv==1.2.3
 PyYAML==6.0.3
 referencing==0.37.0
+requests==2.34.2
 rpds-py==2026.6.3
 sqlparse==0.6.0
 uritemplate==4.2.0

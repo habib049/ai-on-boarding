@@ -9,6 +9,7 @@ db.sqlite3
 .superpowers/
 .pytest_cache/
 .private/
+.env
 
 # sdd_django_demo build workspace (distilled into reference/signup-worked-example/)
 sdd_django_demo/.venv/

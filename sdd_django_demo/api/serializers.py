@@ -107,3 +107,36 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
 class TokenSerializer(serializers.Serializer):
     token = serializers.CharField()
+
+
+class UserAccountSerializer(serializers.ModelSerializer):
+    """The user-list representation. Neither `id` nor `email` is exposed here -
+    AdminChangePasswordView's URL is keyed on username, not id, and email is PII an
+    authenticated caller listing users has no need to see."""
+
+    country = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ['username', 'country', 'date_joined']
+
+    def get_country(self, obj):
+        account_country = getattr(obj, 'accountcountry', None)
+        return account_country.country if account_country else None
+
+
+class AdminChangePasswordSerializer(serializers.Serializer):
+    password = serializers.CharField(
+        required=True, allow_blank=False, write_only=True, validators=[validate_password_strength]
+    )
+
+
+class SelfChangePasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(required=True, allow_blank=False, write_only=True)
+    new_password = serializers.CharField(
+        required=True, allow_blank=False, write_only=True, validators=[validate_password_strength]
+    )
+
+
+class GoogleAuthSerializer(serializers.Serializer):
+    access_token = serializers.CharField(required=True, allow_blank=False, write_only=True)

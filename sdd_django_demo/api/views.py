@@ -441,3 +441,7 @@ class SigninView(generics.GenericAPIView):
                 email_or_username=attempt_key,
                 defaults={'failed_count': 1, 'window_started_at': now, 'last_failed_at': now},
             )
+
+
+# UserListView, AdminChangePasswordView, SelfChangePasswordView, and GoogleAuthView live in
+# mcp_views.py - they exist to serve the MCP server, not the flows below.
