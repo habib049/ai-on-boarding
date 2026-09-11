@@ -95,16 +95,27 @@ def resolve(entry: dict, new_content: str, window: int = 30) -> tuple[str, int |
     original snippet within `window` lines of the recorded line first,
     widen to the whole file if not found there, and mark it resolved
     (code is gone) only if the snippet can't be found anywhere.
+
+    The snippet is usually several lines (callers pass surrounding context,
+    not just the one flagged line), so the search slides a same-sized
+    window of lines rather than checking one line at a time - a multi-line
+    normalized target can never be a substring of one normalized line.
     """
-    target = fingerprint.normalize_snippet(entry.get("snippet", ""))
+    original_snippet = entry.get("snippet", "")
+    target = fingerprint.normalize_snippet(original_snippet)
     if not target:
         return "resolved", None
     lines = new_content.splitlines()
+    span = max(1, len(original_snippet.splitlines()))
 
     def _search(indices):
         for i in indices:
-            if 0 <= i < len(lines) and target in fingerprint.normalize_snippet(lines[i]):
-                return i + 1  # 1-indexed
+            end = i + span
+            if end > len(lines):
+                continue
+            window_text = fingerprint.normalize_snippet("\n".join(lines[i:end]))
+            if target in window_text:
+                return i + (span // 2) + 1  # roughly the window's center, 1-indexed
         return None
 
     old_line = entry.get("line")
