@@ -1,0 +1,52 @@
+{
+  "cases": {
+    "001-clean-pr": {
+      "recall": 1.0,
+      "false_positives": 0,
+      "verdict_correct": true,
+      "blocking_precision": 1.0,
+      "cost_usd": null
+    },
+    "002-unused-import": {
+      "recall": 1.0,
+      "false_positives": 0,
+      "verdict_correct": true,
+      "blocking_precision": 1.0,
+      "cost_usd": null
+    },
+    "003-security-cited-critical": {
+      "recall": 1.0,
+      "false_positives": 0,
+      "verdict_correct": true,
+      "blocking_precision": 1.0,
+      "cost_usd": null
+    },
+    "004-security-uncited-critical": {
+      "recall": 1.0,
+      "false_positives": 0,
+      "verdict_correct": true,
+      "blocking_precision": 1.0,
+      "cost_usd": null
+    },
+    "005-cited-minor": {
+      "recall": 1.0,
+      "false_positives": 0,
+      "verdict_correct": true,
+      "blocking_precision": 1.0,
+      "cost_usd": null
+    },
+    "006-debug-files": {
+      "recall": 1.0,
+      "false_positives": 0,
+      "verdict_correct": false,
+      "blocking_precision": 1.0,
+      "cost_usd": null
+    }
+  },
+  "summary": {
+    "recall": 1.0,
+    "false_positives": 0,
+    "verdict_accuracy": 0.8333333333333334,
+    "cost_usd": 0.0
+  }
+}

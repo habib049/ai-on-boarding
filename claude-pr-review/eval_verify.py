@@ -35,13 +35,14 @@ from target import REPO_ROOT
 
 
 @contextmanager
-def materialize(fixture_dir: Path):
-    """Stage fixture files/ into the repo, then remove them again.
+def materialize(fixture_dir: Path, subdir: str = "files"):
+    """Stage a fixture's file tree into the repo, then remove it again.
 
     Refuses to touch a path that already exists - a fixture is never allowed
-    to overwrite real repository content.
+    to overwrite real repository content. `subdir` defaults to "files" (this
+    module's own fixtures); evals/run_eval.py's fixtures use "snapshot".
     """
-    source_root = fixture_dir / "files"
+    source_root = fixture_dir / subdir
     staged: list[Path] = []
     if not source_root.is_dir():
         print(f"[eval] {fixture_dir}/files/ missing - Layer 3 will read a tree that does not "

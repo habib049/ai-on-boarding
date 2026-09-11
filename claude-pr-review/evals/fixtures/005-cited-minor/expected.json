@@ -1,0 +1,7 @@
+{
+  "must_find": [
+    {"file": "sdd_django_demo/api/test_eval_demo_extra_serializer.py", "line": 4, "min_severity": "MINOR", "should_block": false}
+  ],
+  "must_not_find": [],
+  "expected_verdict": "yes"
+}

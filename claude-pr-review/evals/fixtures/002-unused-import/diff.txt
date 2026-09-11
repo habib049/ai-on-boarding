@@ -1,0 +1,11 @@
+diff --git a/claude-pr-review/_lint_test_file.py b/claude-pr-review/_lint_test_file.py
+new file mode 100644
+index 0000000..3a9f1c2
+--- /dev/null
++++ b/claude-pr-review/_lint_test_file.py
+@@ -0,0 +1,5 @@
++import os
++
++
++def add(a, b):
++    return a + b

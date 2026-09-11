@@ -24,25 +24,16 @@ jobs:
         working-directory: claude-pr-review
         run: pip install -r requirements.txt
 
-      - name: Layer 2 - judge
-        working-directory: claude-pr-review
-        run: python judge.py "${{ github.event.pull_request.number }}" --out build/findings.json
-
-      - name: Layer 3 - verify
+      - name: Review, remembering prior findings on this PR (Phase 3)
+        id: review
         working-directory: claude-pr-review
         run: |
-          python verify.py "${{ github.event.pull_request.number }}" \
-            --findings build/findings.json --out build/verified_findings.json
-
-      - name: Gate - render verdict
-        id: gate
-        working-directory: claude-pr-review
-        run: python gate.py --findings build/verified_findings.json --out build/verdict.md
+          python run.py \
+            --repo "${{ github.repository }}" \
+            --pr "${{ github.event.pull_request.number }}" \
+            --head-sha "${{ github.event.pull_request.head.sha }}"
         continue-on-error: true
 
-      - name: Post verdict as PR comment
-        run: gh pr comment "${{ github.event.pull_request.number }}" --body-file claude-pr-review/build/verdict.md
-
       - name: Fail if not ready to merge
-        if: steps.gate.outcome == 'failure'
+        if: steps.review.outcome == 'failure'
         run: exit 1

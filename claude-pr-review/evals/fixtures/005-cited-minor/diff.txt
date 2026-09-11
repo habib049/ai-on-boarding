@@ -1,0 +1,24 @@
+diff --git a/sdd_django_demo/api/eval_demo_extra_serializer.py b/sdd_django_demo/api/eval_demo_extra_serializer.py
+new file mode 100644
+index 0000000..b1c2d3e
+--- /dev/null
++++ b/sdd_django_demo/api/eval_demo_extra_serializer.py
+@@ -0,0 +1,6 @@
++from rest_framework import serializers
++
++
++class SignupSerializer(serializers.Serializer):
++    email = serializers.EmailField()
++    password = serializers.CharField(write_only=True, min_length=8)
+diff --git a/sdd_django_demo/api/test_eval_demo_extra_serializer.py b/sdd_django_demo/api/test_eval_demo_extra_serializer.py
+new file mode 100644
+index 0000000..c4d5e6f
+--- /dev/null
++++ b/sdd_django_demo/api/test_eval_demo_extra_serializer.py
+@@ -0,0 +1,6 @@
++from .eval_demo_extra_serializer import SignupSerializer
++
++
++def test_signup_serializer_accepts_valid_input():
++    serializer = SignupSerializer(data={"email": "a@example.com", "password": "longenough"})
++    assert serializer.is_valid()

@@ -1,0 +1,8 @@
+{
+  "must_find": [
+    {"file": "sdd_django_demo/api/debug_secret.py", "line": 1, "min_severity": "CRITICAL", "should_block": true},
+    {"file": "sdd_django_demo/api/debug_logging.py", "line": 8, "min_severity": "CRITICAL", "should_block": true}
+  ],
+  "must_not_find": [],
+  "expected_verdict": "no"
+}

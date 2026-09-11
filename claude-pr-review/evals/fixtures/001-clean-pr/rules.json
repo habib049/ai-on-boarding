@@ -1,0 +1,5 @@
+{
+  "CLAUDE.md": "A finding blocks merge only if it cites a requirement, a specific named failing test, or a documented convention. Anything else is a nit: recorded, never blocking.",
+  "openspec/config.yaml": "",
+  "sdd_django_demo/CLAUDE.md": ""
+}
