@@ -111,6 +111,24 @@ def reanchor_changed_files(prior_state: dict | None, unchanged: set[str]) -> tup
     return re_anchored, resolved
 
 
+def attach_metadata(findings: list[dict]) -> list[dict]:
+    """Stamp every fresh finding with a fingerprint and the snippet it was
+    computed from. state.resolve() re-anchors a carried finding by
+    searching a future push's changed file content for this exact snippet
+    - a finding missing it always looks resolved (empty target), whether
+    or not the code is actually still there.
+    """
+    out = []
+    for f in findings:
+        f = dict(f)
+        snippet = _snippet_for(f.get("file"), f.get("line"))
+        f["fp"] = fingerprint.fingerprint(f, snippet)
+        f["snippet"] = snippet
+        f.setdefault("status", "open")
+        out.append(f)
+    return out
+
+
 def run(client, repo: str, pr: str, head_sha: str) -> dict:
     prior_state = fetch_prior_state(repo, pr)
     current_blobs = fetch_current_blobs(repo, pr)
@@ -125,13 +143,11 @@ def run(client, repo: str, pr: str, head_sha: str) -> dict:
         client, target.get_diff(pr), target.repo_rules(), {"findings": new_findings}
     )
 
-    for f in verified.get("findings", []):
-        f["fp"] = fingerprint.fingerprint(f, _snippet_for(f.get("file"), f.get("line")))
-        f.setdefault("status", "open")
+    new_with_metadata = attach_metadata(verified.get("findings", []))
     for f in all_carried:
         f.setdefault("status", "open")
 
-    combined = all_carried + verified.get("findings", []) + resolved
+    combined = all_carried + new_with_metadata + resolved
     combined_result = {"findings": combined, "suppressed_count": judge_result.get("suppressed_count", 0)}
     report, ready = gate.render(combined_result)
 
