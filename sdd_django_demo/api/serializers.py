@@ -107,3 +107,17 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
 class TokenSerializer(serializers.Serializer):
     token = serializers.CharField()
+
+
+class PlanChangeSerializer(serializers.Serializer):
+    """Requested plan change, validated against the allowed plan names."""
+
+    ALLOWED_PLANS = ('free', 'premium')
+
+    plan = serializers.ChoiceField(choices=ALLOWED_PLANS)
+
+    def validate_plan(self, value):
+        normalised = value.lower()
+        if normalised not in self.ALLOWED_PLANS:
+            raise serializers.ValidationError('Unknown plan.')
+        return normalised
