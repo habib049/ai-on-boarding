@@ -1,0 +1,32 @@
+{
+    "findings": [
+        {
+            "severity": "CRITICAL",
+            "summary": "New file hardcodes a signing secret directly in source (`API_SIGNING_SECRET = \"sk-hardcoded-super-secret-do-not-commit-123\"`) and uses it in a naive `payload + secret` signing scheme. This is a committed credential/secret exposure with no reference to Django settings/environment configuration, contradicting the project's environment-driven configuration pattern (`DATABASE_URL` is read via env, not hardcoded, per openspec/config.yaml context) and constitutes a real secret leaked into version control history.",
+            "citation": "openspec/config.yaml context: 'SQLite by default - no environment variables required to run or test... with an opt-in switch to PostgreSQL... setting `DATABASE_URL`' establishes that configuration/secrets belong in environment/settings, not hardcoded in source",
+            "file": "sdd_django_demo/api/debug_secret.py",
+            "line": 1
+        },
+        {
+            "severity": "CRITICAL",
+            "summary": "New function `log_signin_attempt` prints the raw plaintext password to stdout/logs (`print(f\"Signin attempt: username={username} password={password}\")`). This directly exposes credentials in logs. This is exactly the kind of security-sensitive credential exposure the repo's conventions call out, and existing tests in test_signin.py explicitly assert passwords never leak into responses (e.g. `test_signin_response_never_contains_password` asserts `'wrongpassword' not in response.content.decode()`), showing this repo treats password logging as a real regression risk. This new module has no such protection and no test asserting against it.",
+            "citation": "sdd_django_demo/CLAUDE.md: 'Security-sensitive behaviour (auth, credential storage, credential exposure) needs a test that asserts it directly, not incidentally through a success path.'",
+            "file": "sdd_django_demo/api/debug_logging.py",
+            "line": 8
+        },
+        {
+            "severity": "MAJOR",
+            "summary": "`check_password_ok` in the new debug_password_check.py duplicates the exact password-strength validation logic already implemented as `validate_password_strength` in sdd_django_demo/api/serializers.py (same length/letter/digit regex checks), introducing a second, unsynchronized copy of a security-relevant validation rule (PASSWORD_MIN_LENGTH etc. are not reused/imported).",
+            "citation": null,
+            "file": "sdd_django_demo/api/debug_password_check.py",
+            "line": 5
+        },
+        {
+            "severity": "MAJOR",
+            "summary": "None of the three new debug_* modules are wired into urls.py, views.py, or any test file (confirmed no other reference to 'debug_' in the api app), and no tests were added for them despite the project's convention that behavioural/security-sensitive code requires accompanying tests. As committed, this is unreachable/dead code that nonetheless ships a hardcoded secret and password-logging capability into the codebase without a corresponding proposal, spec, or design artifact per the spec-driven process this repo mandates.",
+            "citation": "openspec/config.yaml rules.tasks: 'Code is generated from instructions (proposal, spec, design, tasks); when generated code is wrong, fix the instruction and regenerate rather than hand-patching the output.' and operations.apply.guidance: 'write tests from the spec or proposal... covering every requirement'",
+            "file": "sdd_django_demo/api/debug_logging.py",
+            "line": null
+        }
+    ]
+}

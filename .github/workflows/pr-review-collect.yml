@@ -1,0 +1,49 @@
+# Workflow A of the two-workflow fork-safe pattern (improvement plan 4.1).
+#
+# Why this exists: a `pull_request` event from a fork gets NO secrets and a
+# read-only GITHUB_TOKEN. Nearly every PR to this repo comes from a fork, so
+# a single-workflow reviewer would die on auth at Layer 2 and couldn't post
+# a comment either.
+#
+# This half runs in the untrusted context, so it does exactly one thing:
+# record which PR to review. It installs nothing, and executes no code from
+# the PR - not the PR's scripts, not its dependencies, nothing. The only
+# value that crosses into the trusted half is an integer this workflow reads
+# from the event payload (not from any file the PR controls).
+#
+# The review itself happens in pr-review.yml, which `workflow_run` triggers
+# from the default branch where secrets are available.
+#
+# Deliberately NOT pull_request_target: that would run with ANTHROPIC_API_KEY
+# in scope against a checkout the PR author controls.
+name: PR Review (collect)
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read # never pull-requests: write - this half writes nothing
+
+concurrency:
+  group: pr-review-collect-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Record which PR to review
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          mkdir -p review-input
+          printf '%s' "$PR_NUMBER" > review-input/pr-number
+          printf '%s' "$HEAD_SHA" > review-input/head-sha
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: review-input
+          path: review-input/
+          retention-days: 1

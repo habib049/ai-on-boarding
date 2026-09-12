@@ -1,0 +1,5 @@
+{
+  "CLAUDE.md": "A finding blocks merge only if it cites a requirement, a specific named failing test, or a documented convention. Anything else is a nit: recorded, never blocking.\n\nOther conventions worth knowing up front (also in openspec/config.yaml):\n\n- Tests are written after implementation, from the spec - not TDD. tasks.md is never generated with test-writing tasks; tests are a separate step after /opsx:apply finishes the implementation tasks.\n- Security-sensitive behaviour (auth, credential storage, credential exposure) needs a test that asserts it directly, not incidentally through a success path.",
+  "openspec/config.yaml": "",
+  "sdd_django_demo/CLAUDE.md": ""
+}

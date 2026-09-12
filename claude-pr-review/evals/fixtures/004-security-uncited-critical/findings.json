@@ -1,0 +1,11 @@
+{
+  "findings": [
+    {
+      "file": "sdd_django_demo/api/auth_bypass_demo.py",
+      "line": 3,
+      "severity": "CRITICAL",
+      "summary": "reset_password() skips all token validation when reset_token is omitted, letting any caller reset any user's password with no credential check.",
+      "citation": null
+    }
+  ]
+}

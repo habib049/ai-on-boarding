@@ -1,0 +1,4 @@
+description: eval_verify.py's original hand-built scenario, folded in per Phase 0's acceptance criteria. Three planted files - a hardcoded signing secret, a plaintext-password logger, and a duplicated password validator - authored for PR #66's own testing. Per that PR's description, 5 repeated local trials kept both CRITICAL security findings 5/5 while two MAJOR process findings varied 3/5-4/5; only the two stable CRITICALs are asserted in must_find here so this fixture doesn't silently start failing on the known-flaky MAJORs.
+base_sha: frozen-fixture
+head_sha: frozen-fixture
+source: originally claude-pr-review/fixtures/debug-files, used directly by eval_verify.py

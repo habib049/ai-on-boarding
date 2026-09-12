@@ -1,0 +1,11 @@
+{
+  "findings": [
+    {
+      "file": "sdd_django_demo/api/test_eval_demo_extra_serializer.py",
+      "line": 4,
+      "severity": "MINOR",
+      "summary": "Test for SignupSerializer is added in the same commit as the serializer itself, ahead of the separate test-writing step this repo's process calls for.",
+      "citation": "CLAUDE.md: \"Tests are written after implementation, from the spec - not TDD. tasks.md is never generated with test-writing tasks; tests are a separate step after /opsx:apply finishes the implementation tasks.\""
+    }
+  ]
+}

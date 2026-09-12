@@ -118,28 +118,33 @@ finding, so it now degrades to a visible, non-blocking nit instead of disappeari
 report. `file`/`line` anchors are preserved either way - `verify.py` never touches them, since
 Layer 4 renders a finding by them.
 
-## Testing verify.py without a live PR
+## Testing without a live PR
 
-`eval_verify.py` runs `verify.verify()` against a saved fixture (a directory with `diff.txt`,
-`rules.json`, `findings.json`, and `files/`) instead of a real PR - useful for iterating on
-`prompts/verify.md` without needing a paid CI cycle each time (it still spends real API money
-per trial - it's the round-trip through GitHub Actions and a throwaway PR that's avoided, not the
-API call itself). `fixtures/debug-files/` was captured from a real `judge.py` run against a
-throwaway smoke-test PR (three deliberately flawed files: a hardcoded secret, a plaintext-password
-print, a duplicated validator). Add more fixture directories in the same shape to cover other
-scenarios.
-
-`files/` matters because Layer 3 reads the *working tree* through `tools.py`, not the fixture's
-own diff text - an early version of this harness shipped without it, so every `read_file` against
-a file the fixture's diff added returned "No such file", Layer 3 concluded the described code
-didn't exist, and dropped findings for that reason rather than any reason the fixture was written
-to test. `eval_verify.py` stages `files/`'s contents into the repo for the run and removes them
-afterward (refusing to overwrite anything that already exists there), so the tree Layer 3 sees
-matches the diff it was handed.
+`evals/run_eval.py` runs Layer 3 + Layer 4 against every frozen fixture in `evals/fixtures/` and
+scores the result - useful for iterating on `prompts/verify.md` without a paid CI cycle each time.
+`--dry-run` stubs the model entirely, so harness bugs cost nothing to find.
 
 ```bash
-.venv/bin/python eval_verify.py fixtures/debug-files --trials 3
+make eval            # score every fixture, plus the harness checks
+make eval-baseline   # regenerate evals/baseline.json (human-run)
 ```
+
+A fixture is a directory of frozen artifacts: `diff.txt`, `rules.json`, `findings.json` (Layer 2's
+output shape), `expected.json` (what should be found and what the verdict should be), and
+`snapshot/` - the post-change contents of the files the diff touches.
+
+`snapshot/` matters because Layer 3 reads the *working tree* through `tools.py`, not the fixture's
+own diff text - an early version of this harness shipped without it, so every `read_file` against
+a file the fixture's diff added failed, Layer 3 concluded the described code didn't exist, and
+dropped findings for that reason rather than any reason the fixture was written to test.
+`evals/fixture_tree.py` stages `snapshot/` into the repo for the run and removes it afterward
+(refusing to overwrite anything already there), so the tree Layer 3 sees matches the diff it was
+handed. That episode is also why `tools.execute()` returns `is_error` on a failed call rather than
+letting "No such file" read as a fact about the repository.
+
+Each case reports `usage` alongside its scores - input/output tokens, cache reads, and USD. The
+per-finding calls share one cached diff+rules prefix, so `cache_read_input_tokens` dropping to
+zero is the signal that something started invalidating it.
 
 ## Why this shape
 
@@ -160,16 +165,37 @@ matches the diff it was handed.
 
 ## CI
 
-`.github/workflows/pr-review-agent.yml` runs all four layers on every PR (`opened`,
-`synchronize`) against `secrets.ANTHROPIC_API_KEY`, posts Layer 4's verdict as a PR comment via
-`gh pr comment`, and fails the check when the verdict is `no`.
+Two workflows, because nearly every PR to this repo comes from a fork and a `pull_request` event
+from a fork gets no secrets and a read-only token - a single-workflow reviewer would die on auth
+at Layer 2 and couldn't post a comment either.
+
+- `.github/workflows/pr-review-collect.yml` runs in the untrusted context on `opened`/
+  `synchronize`. It holds no secrets and no write permission, installs nothing, and executes no
+  code from the PR. It records the PR number as an artifact and stops.
+- `.github/workflows/pr-review-agent.yml` runs on `workflow_run`, from the default branch, where
+  secrets and a write-scoped token are available. It runs `run.py` (all four layers plus the
+  sticky-comment state), posts the verdict, and fails the check when the verdict is `no`.
+
+What keeps that safe: the code that executes is the default branch's, never the PR's. The PR's
+tree is fetched and read - for lint, snippets, and the agent's read-only tools - but never run,
+and the diff reaches the model wrapped in `<untrusted_diff>` markers. The conventions the PR is
+judged against come from the trusted checkout (`PR_REVIEW_RULES_ROOT`), not from the PR, so a
+one-line edit to `CLAUDE.md` can't rewrite the rules it's reviewed by. Deliberately not
+`pull_request_target`, which would put `ANTHROPIC_API_KEY` in scope on a PR-controlled checkout.
+
+`evals/checks.py` asserts both properties - the exit path still fails the job, and the untrusted
+half still holds no secrets or write access - on every `make eval`.
 
 ## What's been tested
 
-Local (`eval_verify.py fixtures/debug-files --trials 5`, valid fixture, 5 repeated trials): the
-CI-visible verdict (`Ready to merge: no`) was stable across all 5, with per-finding disposition
-varying underneath - the two CRITICAL security findings survived 5/5, the two MAJOR process
-findings 3/5-4/5, and zero `file`/`line` mutations.
+Local, 5 repeated trials against the scenario now frozen as
+`evals/fixtures/006-debug-files/`: the CI-visible verdict (`Ready to merge: no`) was stable across
+all 5, with per-finding disposition varying underneath - the two CRITICAL security findings
+survived 5/5, the two MAJOR process findings 3/5-4/5, and zero `file`/`line` mutations.
+
+Offline, every push: 243 tests, including `test_lifecycle.py`, which drives several pushes on one
+PR - ticking, un-ticking, quoting, corrupt state, severity escalation - through the real
+state/dedupe/render/post code with GitHub and the model stubbed.
 
 Live, end to end via `.github/workflows/pr-review-agent.yml` against a throwaway PR: Layer 2
 raised 4 findings, Layer 3 kept 3 with all iterations inside the 30-turn cap, and Layer 4 posted
@@ -184,7 +210,6 @@ clean re-run kept it, isolating the API hiccup as the cause rather than the find
 
 ## Not built yet
 
-Path filtering (e.g. skip non-code PRs), re-running only on new commits rather than the whole
-diff each time, and a larger fixture set with known-correct verdicts (`fixtures/` currently has
-one scenario) to regression-test `judge.py`/`verify.py`/`gate.py` against when the prompts
-change - `eval_verify.py` covers `verify.py`; `judge.py` and `gate.py` have no equivalent yet.
+Path filtering (e.g. skip non-code PRs), and a larger fixture set - `evals/fixtures/` has six
+scenarios and covers Layer 3 + Layer 4, while `judge.py` has no fixture harness of its own
+because it is coupled to `target.py`'s live git/gh calls to resolve "what changed".

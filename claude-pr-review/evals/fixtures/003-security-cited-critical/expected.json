@@ -1,0 +1,7 @@
+{
+  "must_find": [
+    {"file": "sdd_django_demo/api/auth_bypass_demo.py", "line": 3, "min_severity": "CRITICAL", "should_block": true}
+  ],
+  "must_not_find": [],
+  "expected_verdict": "no"
+}

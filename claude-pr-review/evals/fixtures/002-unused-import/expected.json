@@ -1,0 +1,7 @@
+{
+  "must_find": [
+    {"file": "claude-pr-review/_lint_test_file.py", "line": 1, "min_severity": "MINOR", "should_block": false}
+  ],
+  "must_not_find": [],
+  "expected_verdict": "yes"
+}

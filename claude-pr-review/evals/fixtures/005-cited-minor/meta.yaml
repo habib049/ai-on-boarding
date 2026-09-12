@@ -1,0 +1,3 @@
+description: Required case 5 from the Phase 0 plan - a cited MINOR process nit (test written alongside implementation, ahead of this repo's separate test-writing step). Citation is real but the convention is about workflow sequencing, not commit granularity - a plausible "stretch" case for Layer 3, deliberately kept rather than sharpened, since that borderline is itself worth measuring per the plan's note on citations Layer 3 judges a stretch.
+base_sha: frozen-fixture
+head_sha: frozen-fixture

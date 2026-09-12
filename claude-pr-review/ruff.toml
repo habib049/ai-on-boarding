@@ -8,12 +8,59 @@
 # import sorter that this repo's own apps (e.g. `embargo`) are first-party,
 # not third-party.
 src = ["sdd_django_demo", "tooling"]
-extend-exclude = ["*/.venv/*", "*/node_modules/*", "*/migrations/*"]
+
+# Fixture snapshots are deliberately flawed code - an unused import IS what
+# fixture 002 exists to test, and the auth-bypass fixtures reference an
+# undefined helper on purpose. Linting them reports five permanent false
+# alarms, and "cleaning them up" would silently gut the eval suite.
+#
+# Both spellings are listed because exclude patterns resolve against ruff's
+# working directory, and this config is invoked from two places: lint.py runs
+# it from the repo root, a developer runs it from claude-pr-review/.
+extend-exclude = [
+    "*/.venv/*",
+    "*/node_modules/*",
+    "*/migrations/*",
+    "claude-pr-review/evals/fixtures/**",
+    "evals/fixtures/**",
+]
 
 [lint]
+# S (flake8-bandit) and B (flake8-bugbear) are selected deliberately, and
+# they are what make Layer 1 worth having rather than a style checker.
+#
+# severity.py maps S -> CRITICAL and B -> MAJOR, but with only E/F/I
+# selected the linter was never asked to check for either, so those two
+# rows were unreachable and Layer 1 could not produce a finding above
+# MAJOR. A hardcoded secret - the top of this tool's own severity
+# definition - was invisible to the one layer that is deterministic, free,
+# and immune to a model changing its mind: `ruff:S105` catches the planted
+# secret in evals/fixtures/006 that Layer 2 otherwise has to find with a
+# paid Sonnet call, and catches it with a citation nothing can argue away.
+#
 # E501 (line-too-long) is off: this codebase wraps prose comments by
 # sentence, not by a fixed column, and established files run well past 100
 # characters by design - enforcing a line-length limit here would flag the
 # project's own established style, not a defect the PR introduced.
-select = ["E", "F", "I"]
-ignore = ["E501"]
+select = ["E", "F", "I", "S", "B"]
+ignore = [
+    "E501",
+    # 619 hits across this repo: every assert in every test. The test
+    # suites here are assert-based by convention, so this reports the
+    # project's own style as a security finding.
+    "S101",
+    # Fire on every legitimate subprocess call - this tool shells out to
+    # `gh`, `rg` and `ruff` by design, and "you used a partial executable
+    # path" on each one is noise that would bury the findings that matter.
+    "S603",
+    "S607",
+]
+
+# Fake credentials in a test are the correct way to write the test. Every
+# S105/S106/S107 hit in this repo's real source is a test fixture; none are
+# in production code, so scoping the exemption to test files keeps the rule
+# sharp where it counts.
+[lint.per-file-ignores]
+"**/test_*.py" = ["S105", "S106", "S107", "S108"]
+"**/tests/**" = ["S105", "S106", "S107", "S108"]
+"**/conftest.py" = ["S105", "S106", "S107"]

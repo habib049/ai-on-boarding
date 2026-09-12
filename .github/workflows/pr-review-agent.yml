@@ -1,48 +1,107 @@
+# Workflow B of the two-workflow fork-safe pattern (improvement plan 4.1).
+#
+# `workflow_run` runs in the BASE repo's context from the DEFAULT BRANCH, so
+# secrets and a write-scoped token are available even when the PR came from
+# a fork. What makes that safe is the separation kept below:
+#
+#   - the code that runs is this repo's own, checked out from the default
+#     branch. Nothing from the PR is ever installed or executed.
+#   - the PR's tree is fetched and READ (for snippets, lint, and the agent's
+#     read-only tools) but never run. It is attacker-controlled on a fork
+#     PR, which is why the diff reaches the model wrapped in
+#     <untrusted_diff> markers.
+#   - the conventions the PR is judged against come from the trusted
+#     checkout (PR_REVIEW_RULES_ROOT), not from the PR. Otherwise a one-line
+#     edit to CLAUDE.md in the PR could rewrite the rules it's reviewed by.
+#   - the only value crossing from the untrusted half is a PR number, which
+#     workflow A read from the event payload and this job re-validates as
+#     digits before use.
+#
+# Deliberately NOT pull_request_target - that runs with ANTHROPIC_API_KEY in
+# scope against a checkout the PR author controls.
 name: PR Review Agent
 
 on:
-  pull_request:
-    types: [opened, synchronize]
+  workflow_run:
+    workflows: ["PR Review (collect)"]
+    types: [completed]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+# 4.2: five commits pushed in thirty seconds would otherwise mean five full
+# pipelines racing to edit the same sticky comment. Cancelling is safe with
+# the Phase 3 state model because the comment write is a single API call -
+# a cancelled run either wrote or it didn't, there is no partial state.
+concurrency:
+  group: pr-review-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
 
 jobs:
   review:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
+    if: github.event.workflow_run.conclusion == 'success'
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     steps:
-      - uses: actions/checkout@v6
+      - name: Check out the trusted default branch (the code that runs)
+        uses: actions/checkout@v6
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install review agent
+      - name: Download the PR number recorded by the collect workflow
+        uses: actions/download-artifact@v4
+        with:
+          name: review-input
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: review-input
+
+      - name: Validate the handoff
+        id: meta
+        run: |
+          PR_NUMBER="$(tr -dc '0-9' < review-input/pr-number)"
+          HEAD_SHA="$(tr -dc '0-9a-f' < review-input/head-sha)"
+          if [ -z "$PR_NUMBER" ] || [ -z "$HEAD_SHA" ]; then
+            echo "collect workflow produced no usable PR reference" >&2
+            exit 1
+          fi
+          echo "pr=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch the PR's tree as data (never executed)
+        env:
+          PR_NUMBER: ${{ steps.meta.outputs.pr }}
+        run: |
+          git fetch --no-tags origin "refs/pull/$PR_NUMBER/head"
+          git worktree add --detach "$RUNNER_TEMP/pr-tree" FETCH_HEAD
+
+      - name: Install the review agent from the trusted checkout
         working-directory: claude-pr-review
         run: pip install -r requirements.txt
 
-      - name: Layer 2 - judge
+      - name: Review, remembering prior findings on this PR
+        id: review
         working-directory: claude-pr-review
-        run: python judge.py "${{ github.event.pull_request.number }}" --out build/findings.json
-
-      - name: Layer 3 - verify
-        working-directory: claude-pr-review
+        env:
+          # What is reviewed: the PR's tree. What the rules come from: here.
+          PR_REVIEW_REPO_ROOT: ${{ runner.temp }}/pr-tree
+          PR_REVIEW_RULES_ROOT: ${{ github.workspace }}
         run: |
-          python verify.py "${{ github.event.pull_request.number }}" \
-            --findings build/findings.json --out build/verified_findings.json
-
-      - name: Gate - render verdict
-        id: gate
-        working-directory: claude-pr-review
-        run: python gate.py --findings build/verified_findings.json --out build/verdict.md
+          python run.py \
+            --repo "${{ github.repository }}" \
+            --pr "${{ steps.meta.outputs.pr }}" \
+            --head-sha "${{ steps.meta.outputs.head_sha }}"
         continue-on-error: true
 
-      - name: Post verdict as PR comment
-        run: gh pr comment "${{ github.event.pull_request.number }}" --body-file claude-pr-review/build/verdict.md
-
+      # 4.4: continue-on-error above exists so the verdict comment still gets
+      # posted on a "no". This step is what actually fails the check - remove
+      # it and the reviewer silently becomes advisory. evals/checks.py asserts
+      # this wiring is still in place.
       - name: Fail if not ready to merge
-        if: steps.gate.outcome == 'failure'
+        if: steps.review.outcome == 'failure'
         run: exit 1

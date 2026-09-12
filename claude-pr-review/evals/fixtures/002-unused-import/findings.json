@@ -1,0 +1,12 @@
+{
+  "findings": [
+    {
+      "file": "claude-pr-review/_lint_test_file.py",
+      "line": 1,
+      "severity": "MINOR",
+      "summary": "`os` imported but unused",
+      "citation": "ruff:F401",
+      "source": "lint"
+    }
+  ]
+}

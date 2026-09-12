@@ -1,0 +1,3 @@
+description: Required case 2 from the Phase 0 plan - a lint-only violation (unused import). Confirms Fix 1 (lint findings reach the gate) end to end. Severity updated for Phase 1.1's ruff severity map - F401 is MINOR, not the old blanket MAJOR, per the plan's own framing ("an unused import fails the check identically to a broken auth path" was the bug being fixed). A cited MINOR does not block, so expected_verdict flips from "no" (Phase 0 baseline) to "yes" here.
+base_sha: frozen-fixture
+head_sha: frozen-fixture

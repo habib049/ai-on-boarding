@@ -21,6 +21,13 @@ SEARCH_TIMEOUT_SECONDS = 30
 SKIP_DIRS = {".venv", "venv", "__pycache__", ".git", "node_modules", ".mypy_cache", ".pytest_cache", ".ruff_cache"}
 
 
+class ToolError(RuntimeError):
+    """A tool call that failed, as opposed to one that succeeded with an
+    empty result. execute() turns this into `is_error: true` so the model
+    can tell "the call failed" from "the answer is nothing".
+    """
+
+
 def _resolve_within_repo(path: str) -> Path:
     """Resolve `path` to an absolute path and confirm it stays inside
     REPO_ROOT - rejects `..` traversal, absolute paths outside the repo, and
@@ -28,17 +35,14 @@ def _resolve_within_repo(path: str) -> Path:
     """
     candidate = (REPO_ROOT / path).resolve()
     if not candidate.is_relative_to(REPO_ROOT):
-        raise ValueError(f"path {path!r} resolves outside the repository")
+        raise ToolError(f"path {path!r} resolves outside the repository")
     return candidate
 
 
 def read_file(path: str) -> str:
-    try:
-        target = _resolve_within_repo(path)
-    except ValueError as exc:
-        return str(exc)
+    target = _resolve_within_repo(path)
     if not target.is_file():
-        return f"No such file: {path}"
+        raise ToolError(f"No such file: {path}")
     content = target.read_text(errors="replace")
     if len(content) > MAX_OUTPUT_CHARS:
         content = content[:MAX_OUTPUT_CHARS] + "\n... (truncated)"
@@ -46,10 +50,7 @@ def read_file(path: str) -> str:
 
 
 def grep(pattern: str, path: str = ".") -> str:
-    try:
-        target = _resolve_within_repo(path)
-    except ValueError as exc:
-        return str(exc)
+    target = _resolve_within_repo(path)
 
     try:
         # `--` stops rg from parsing `pattern` as flags - pattern is untrusted
@@ -62,7 +63,7 @@ def grep(pattern: str, path: str = ".") -> str:
     except FileNotFoundError:
         result = None
     except subprocess.TimeoutExpired:
-        return "Search failed: timed out"
+        raise ToolError("Search failed: timed out") from None
 
     if result is None or result.returncode not in (0, 1):  # 1 = no matches, not an error
         try:  # rg missing or errored oddly - fall back to grep
@@ -71,11 +72,11 @@ def grep(pattern: str, path: str = ".") -> str:
                 capture_output=True, text=True, timeout=SEARCH_TIMEOUT_SECONDS,
             )
         except FileNotFoundError:
-            return "Search failed: neither `rg` nor `grep` is available"
+            raise ToolError("Search failed: neither `rg` nor `grep` is available") from None
         except subprocess.TimeoutExpired:
-            return "Search failed: timed out"
+            raise ToolError("Search failed: timed out") from None
         if result.returncode not in (0, 1):
-            return f"Search failed: {result.stderr.strip()}"
+            raise ToolError(f"Search failed: {result.stderr.strip()}")
 
     output = result.stdout.replace(str(REPO_ROOT) + "/", "")
     if not output.strip():
@@ -86,12 +87,9 @@ def grep(pattern: str, path: str = ".") -> str:
 
 
 def list_files(directory: str = ".", pattern: str = "*") -> str:
-    try:
-        target = _resolve_within_repo(directory)
-    except ValueError as exc:
-        return str(exc)
+    target = _resolve_within_repo(directory)
     if not target.is_dir():
-        return f"No such directory: {directory}"
+        raise ToolError(f"No such directory: {directory}")
 
     matches = []
     for root, dirnames, filenames in os.walk(target):
@@ -115,6 +113,7 @@ def list_files(directory: str = ".", pattern: str = "*") -> str:
 TOOLS = [
     {
         "name": "read_file",
+        "strict": True,
         "description": "Read the full contents of a file in this repository. Call this to inspect existing code when checking for duplication or convention compliance.",
         "input_schema": {
             "type": "object",
@@ -130,6 +129,7 @@ TOOLS = [
     },
     {
         "name": "grep",
+        "strict": True,
         "description": "Search the repository for a regex pattern. Use this to find similarly-named functions or duplicated logic elsewhere in the codebase before raising a blast-radius finding.",
         "input_schema": {
             "type": "object",
@@ -146,6 +146,7 @@ TOOLS = [
     },
     {
         "name": "list_files",
+        "strict": True,
         "description": "List files under a directory in this repository, optionally filtered by a glob pattern (e.g. '*.py'). Use this to explore repo structure.",
         "input_schema": {
             "type": "object",
@@ -165,11 +166,29 @@ TOOLS = [
 DISPATCH = {"read_file": read_file, "grep": grep, "list_files": list_files}
 
 
-def execute(name: str, tool_input: dict) -> str:
+def execute(name: str, tool_input: dict) -> tuple[str, bool]:
+    """Run a tool call. Returns (content, is_error).
+
+    The flag matters: a failed call must come back as a `tool_result` with
+    `is_error: true`, not as ordinary content. Returning "No such file:
+    x.py" as a normal result reads to the model as a fact about the
+    repository rather than a failed call, and a verifier that believes a
+    file is missing drops findings for that reason alone - a failure mode
+    seen for real, and the reason evals/fixture_tree.py stages a fixture's
+    files into the tree before Layer 3 reads it.
+
+    "No matches." and "No files matched." are results, not errors: the
+    search ran and the answer is empty.
+    """
     handler = DISPATCH.get(name)
     if handler is None:
-        return f"Unknown tool: {name}"
+        return f"Unknown tool: {name}", True
     try:
-        return handler(**tool_input)
+        return handler(**tool_input), False
+    except ToolError as exc:
+        return str(exc), True
     except TypeError as exc:
-        return f"Bad arguments for {name}: {exc}"
+        # Unreachable while every tool declares strict: true (the API
+        # validates arguments against the schema before they reach us), but
+        # a schema edit that drops strict shouldn't crash the run.
+        return f"Bad arguments for {name}: {exc}", True

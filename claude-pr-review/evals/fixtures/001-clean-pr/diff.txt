@@ -1,0 +1,11 @@
+diff --git a/claude-pr-review/lint.py b/claude-pr-review/lint.py
+index 1111111..2222222 100644
+--- a/claude-pr-review/lint.py
++++ b/claude-pr-review/lint.py
+@@ -34,6 +34,7 @@ def _ruff() -> str:
+
+
+ def run(files: list[str]) -> dict:
++    """Run ruff over `files`; see module docstring for the exit-code contract."""
+     if not files:
+         return {"status": "pass", "findings": []}

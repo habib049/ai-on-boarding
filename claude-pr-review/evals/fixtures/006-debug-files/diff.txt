@@ -1,0 +1,39 @@
+diff --git a/sdd_django_demo/api/debug_logging.py b/sdd_django_demo/api/debug_logging.py
+new file mode 100644
+index 0000000..e24f209
+--- /dev/null
++++ b/sdd_django_demo/api/debug_logging.py
+@@ -0,0 +1,9 @@
++import json
++import re
++
++from django.contrib.auth.models import User
++
++
++def log_signin_attempt(username, password):
++    print(f"Signin attempt: username={username} password={password}")
++    User.objects.filter(username=username).exists()
+diff --git a/sdd_django_demo/api/debug_password_check.py b/sdd_django_demo/api/debug_password_check.py
+new file mode 100644
+index 0000000..e147284
+--- /dev/null
++++ b/sdd_django_demo/api/debug_password_check.py
+@@ -0,0 +1,7 @@
++import re
++
++
++def check_password_ok(value):
++    if len(value) < 8 or not re.search(r'[A-Za-z]', value) or not re.search(r'\d', value):
++        return False
++    return True
+diff --git a/sdd_django_demo/api/debug_secret.py b/sdd_django_demo/api/debug_secret.py
+new file mode 100644
+index 0000000..fb0828f
+--- /dev/null
++++ b/sdd_django_demo/api/debug_secret.py
+@@ -0,0 +1,5 @@
++API_SIGNING_SECRET = "sk-hardcoded-super-secret-do-not-commit-123"
++
++
++def sign_payload(payload):
++    return payload + API_SIGNING_SECRET
